@@ -38,7 +38,8 @@ export const log = (...args) => createIO(({ console }) => {
 
 Here’s a function that simply adds two values.
 Even it can import `console.js`, it doesn’t know how to run it.
-So basically if we ban all pure function calls (e.g. banning access to `console`, `Math.random`, `Date.now`, etc) we end up with a truly pure code in this module.
+So basically if we ban all impure function calls 
+(e.g. banning access to `console`, `Math.random`, `Date.now`, etc) we end up with a truly pure code in this module.
 
 ```js
 // example/add.js

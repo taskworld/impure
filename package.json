@@ -26,5 +26,6 @@
   "homepage": "https://github.com/taskworld/impure#readme",
   "devDependencies": {
     "essay": "^3.0.1"
-  }
+  },
+  "dependencies": {}
 }
