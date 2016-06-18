@@ -1,0 +1,30 @@
+{
+  "name": "impure",
+  "version": "1.0.0",
+  "description": "A container for impure code.",
+  "main": "lib/index.js",
+  "scripts": {
+    "prepublish": "essay build",
+    "test": "essay test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/taskworld/impure.git"
+  },
+  "keywords": [
+    "IO"
+  ],
+  "files": [
+    "lib",
+    "src"
+  ],
+  "author": "Thai Pangsakulyanont <org.yi.dttvb@gmail.com> (http://dt.in.th/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/taskworld/impure/issues"
+  },
+  "homepage": "https://github.com/taskworld/impure#readme",
+  "devDependencies": {
+    "essay": "^3.0.1"
+  }
+}
