@@ -1,4 +1,4 @@
-# impure
+# impure [![Build Status](https://travis-ci.org/taskworld/impure.svg?branch=master)](https://travis-ci.org/taskworld/impure) [![codecov](https://codecov.io/gh/taskworld/impure/branch/master/graph/badge.svg)](https://codecov.io/gh/taskworld/impure)
 
 __A wrapper object for non-deterministic code.__
 
