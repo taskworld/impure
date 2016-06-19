@@ -11,19 +11,23 @@ They are easier to reason.
 They are easier to test.
 
 Haskell enforces purity at type level,
-by clearly separating apart IO functions and pure functions.
-IO functions can call pure functions, but pure functions cannot produce IO.
+by clearly separating IO functions apart from pure functions.
+IO functions can call pure functions and produce side-effects,
+but pure functions cannot produce any side-effect.
 
 In JavaScript,
 there is no such distinction.
 Any function may freely call any other function.
-Any many times, when not used carefully, this can produce unintended side-effects.
-By wrapping all IO operations inside a wrapper,
-all side-effects must be invoked explicitly.
+And many times, when not used carefully, this can produce unintended side-effects.
+
+By wrapping all non-deterministic code inside a wrapper,
+all side-effects must be invoked through a runner.
 If your function is not wrapped in IO,
 it cannot cause any side-effect to happen.
 
 ## Example
+
+### An IO function [(...args) &rarr; IO]
 
 Here, we’re wrapping `console.log()` inside an IO wrapper.
 
@@ -36,19 +40,35 @@ export const log = (...args) => createIO(({ console }) => {
 })
 ```
 
-Here’s a function that simply adds two values.
-Even it can import `console.js`, it doesn’t know how to run it.
-So basically if we ban all impure function calls 
-(e.g. banning access to `console`, `Math.random`, `Date.now`, etc) we end up with a truly pure code in this module.
+It does not access any global variable.
+Instead, the `console` object is injected into the IO.
+
+
+### A pure function
+
+Here’s a function that simply adds two values, just for example.
+
+You can see that even though it can import `console.js` and call `log()`,
+it will not produce any side-effect.
+You only receive a wrapper,
+and the only way to make side-effect happen is to trigger it explicitly (through the `run` function).
+
+Since this function is not given the `run` function,
+it cannot cause any IO operation to perform.
+So basically if we ban all impure function calls
+(e.g. banning access to `console`, `Math.random`, `Date.now`, etc)
+we end up with a truly pure code in this module.
 
 ```js
 // example/add.js
 export const add = (a, b) => a + b
 ```
 
-Maybe here’s our main function.
-Since it needs to output things, it needs to be impure.
-But as an impure code, it has the ability to invoke other impure code (through `run`).
+
+### Another IO function
+
+Here’s our main function.
+It runs our pure function and invoke our first IO function to log the result.
 
 ```js
 // example/main.js
@@ -62,7 +82,10 @@ export const main = () => createIO((context, run) => {
 })
 ```
 
-To actually run a wrapped IO object, you need to create a runner.
+
+### Entry point
+
+To actually run a wrapped IO object, you need to create the `run` function.
 For example, here’s how one might create an application’s entry point.
 
 ```js
@@ -75,7 +98,10 @@ const run = createRun({ context })
 run(main())
 ```
 
-This actually makes our code testable — as we can create a fake console.
+
+### Testing code with IO
+
+This actually makes our code testable — as we can create a fake console and use it in our test.
 
 ```js
 // example/test-utils/createFakeConsole.js
@@ -91,8 +117,6 @@ export function createFakeConsole () {
   }
 }
 ```
-
-Then we can use it in our test.
 
 ```js
 // example/main.test.js
