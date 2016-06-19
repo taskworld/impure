@@ -1,0 +1,7 @@
+language: node_js
+node_js:
+- '6'
+before_script:
+- npm i -g codecov
+after_success:
+- codecov
