@@ -33,9 +33,9 @@ Here, we’re wrapping `console.log()` inside an IO wrapper.
 
 ```js
 // example/console.js
-import { createIO } from '..'
+import * as IO from '..'
 
-export const log = (...args) => createIO(({ console }) => {
+export const log = (...args) => IO.create(({ console }) => {
   console.log(...args)
 })
 ```
@@ -74,11 +74,11 @@ It runs our pure function and invoke our first IO function to log the result.
 // example/main.js
 import { add } from './add'
 import { log } from './console'
-import { createIO } from '..'
+import * as IO from '..'
 
-export const main = () => createIO((context, run) => {
+export const main = IO.do(function* () {
   const result = add(30, 12)
-  run(log('The result is ' + result))
+  yield log('The result is ' + result)
 })
 ```
 
@@ -95,7 +95,7 @@ import { main } from './main'
 
 const context = { console }
 const run = createRun({ context })
-run(main())
+run(main()).catch(e => setTimeout(() => { throw e }))
 ```
 
 
@@ -162,12 +162,121 @@ export function createRun ({ context }) {
 ```
 
 ```js
+// wrapGenerator.js
+import { createIO } from './createIO'
+import runInContext from './_runInContext'
+
+export function wrapGenerator (generatorFunction) {
+  return function () {
+    return createIO((context, run) => {
+      return new Promise((resolve, reject) => {
+        const iterator = generatorFunction.apply(this, arguments)
+        function step (exec) {
+          try {
+            const result = exec()
+            if (result.done) {
+              return () => resolve(result.value)
+            } else {
+              return () => {
+                if (typeof result.value[runInContext] !== 'function') {
+                  throw new TypeError('Expected an IO object to be yielded.')
+                }
+                invoke(result.value)
+              }
+            }
+          } catch (e) {
+            return () => reject(e)
+          }
+        }
+        function invoke (io) {
+          return (Promise.resolve(run(io))
+            .then(
+              result => step(() => iterator.next(result)),
+              error => step(() => iterator.throw(error))
+            )
+            .then(f => f())
+          )
+        }
+        step(() => iterator.next())()
+      })
+    })
+  }
+}
+```
+
+```js
+// wrapGenerator.test.js
+import { createIO } from './createIO'
+import { createRun } from './createRun'
+import { wrapGenerator } from './wrapGenerator'
+const run = createRun({ context: { } })
+
+it('passes arguments from IO function to the generator', () => {
+  const fn = wrapGenerator(function* (x, y) {
+    assert(x === 42)
+    assert(y === 96)
+  })
+  return ioShouldSucceed(fn(42, 96))
+})
+
+it('resolves with result returned from the generator', () => {
+  const fn = wrapGenerator(function* () {
+    assert((yield fn2()) === 50)
+  })
+  const fn2 = wrapGenerator(function* () {
+    return 50
+  })
+  return ioShouldSucceed(fn())
+})
+
+it('fail when generator throws', () => {
+  const fn = wrapGenerator(function* () {
+    throw new Error('Something bad happened!')
+  })
+  return ioShouldFail(fn())
+})
+
+it('fail when yielding a non-IO', () => {
+  const fn = wrapGenerator(function* () {
+    yield 42
+  })
+  return ioShouldFail(fn())
+})
+
+it('fail when a yielded IO throws', () => {
+  const fn = wrapGenerator(function* () {
+    yield fn2()
+  })
+  const fn2 = wrapGenerator(function* () {
+    throw new Error('Something bad happened!')
+  })
+  return ioShouldFail(fn())
+})
+
+function ioShouldSucceed (io) {
+  return Promise.resolve(run(io))
+}
+
+function ioShouldFail (io) {
+  return Promise.resolve(run(io)).then(
+    () => { throw new Error('Expected IO to fail') },
+    () => { }
+  )
+}
+```
+
+```js
 // _runInContext.js
 export default '(╯°□°)╯︵ ┻━┻'
 ```
 
 ```js
 // index.js
-export { createIO } from './createIO'
-export { createRun } from './createRun'
+import { createIO } from './createIO'
+import { createRun } from './createRun'
+import { wrapGenerator } from './wrapGenerator'
+
+export { createIO, createRun }
+export { createIO as create }
+export { wrapGenerator as do }
 ```
