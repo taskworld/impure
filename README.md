@@ -10,25 +10,31 @@ They are referentially-transparent.
 They are easier to reason.
 They are easier to test.
 
-Haskell enforces purity at type level,
+Haskell enforces purity __at the type level__,
 by clearly separating IO functions apart from pure functions.
-IO functions can call pure functions and produce side-effects,
-but pure functions cannot produce any side-effect.
+It’s easy for IO functions to call pure functions,
+but pure functions cannot easily call IO functions.
+This makes it artifically hard to produce side-effect in pure functions.
 
 In JavaScript,
 there is no such distinction.
 Any function may freely call any other function.
-And many times, when not used carefully, this can produce unintended side-effects.
+And many times, when function calls are not used carefully,
+your code may produce unintended side-effects.
 
-By wrapping all non-deterministic code inside a wrapper,
+By wrapping all such “non-deterministic code” inside a wrapper,
 all side-effects must be invoked through a runner.
-If your function is not wrapped in IO,
+
+Therefore, if your function is not wrapped in IO,
 it cannot cause any side-effect to happen.
+
 
 ## Example
 
-### An IO function [(...args) &rarr; IO]
+### An IO function 「 (...args) &rarr; IO 」
 
+An IO function is a function that returns an IO wrapper.
+An IO wrapper is created using `IO.create(callback)` function.
 Here, we’re wrapping `console.log()` inside an IO wrapper.
 
 ```js
@@ -41,7 +47,7 @@ export const log = (...args) => IO.create(({ console }) => {
 ```
 
 It does not access any global variable.
-Instead, the `console` object is injected into the IO.
+Instead, the `console` object is injected into the callback function in `IO.create`.
 
 
 ### A pure function
@@ -49,15 +55,7 @@ Instead, the `console` object is injected into the IO.
 Here’s a function that simply adds two values, just for example.
 
 You can see that even though it can import `console.js` and call `log()`,
-it will not produce any side-effect.
-You only receive a wrapper,
-and the only way to make side-effect happen is to trigger it explicitly (through the `run` function).
-
-Since this function is not given the `run` function,
-it cannot cause any IO operation to perform.
-So basically if we ban all impure function calls
-(e.g. banning access to `console`, `Math.random`, `Date.now`, etc)
-we end up with a truly pure code in this module.
+you only get an IO wrapper back!
 
 ```js
 // example/add.js
@@ -65,10 +63,10 @@ export const add = (a, b) => a + b
 ```
 
 
-### Another IO function
+### Composing IO functions.
 
 Here’s our main function.
-It runs our pure function and invoke our first IO function to log the result.
+By using `IO.do(generatorFunction)`, this allows composing side-effects.
 
 ```js
 // example/main.js
@@ -85,7 +83,8 @@ export const main = IO.do(function* () {
 
 ### Entry point
 
-To actually run a wrapped IO object, you need to create the `run` function.
+To actually run an IO function and cause side-effects,
+you need to create the `run` function.
 For example, here’s how one might create an application’s entry point.
 
 ```js
@@ -98,10 +97,13 @@ const run = createRun({ context })
 run(main()).catch(e => setTimeout(() => { throw e }))
 ```
 
+The context is injected into each IO function,
+allowing an IO function to access the console without having to refer to a global variable.
+
 
 ### Testing code with IO
 
-This actually makes our code testable — as we can create a fake console and use it in our test.
+This actually makes our code testable; we can create a fake console and use it in our test.
 
 ```js
 // example/test-utils/createFakeConsole.js
@@ -136,6 +138,24 @@ it('should log the result to console', () => {
 ## the implementation
 
 ```js
+// index.js
+import { createIO } from './createIO'
+import { createRun } from './createRun'
+import { wrapGenerator } from './wrapGenerator'
+
+export { createIO, createRun }
+export { createIO as create }
+export { wrapGenerator as do }
+```
+
+
+### `IO.create(callback)`
+
+`IO.create` simply puts the `callback` function into an object with obscurely-named method.
+
+The `callback` function will be called with the context (see `IO.createRun`) and the `run` function, which lets the callback function to run nested IO operations.
+
+```js
 // createIO.js
 import runInContext from './_runInContext'
 
@@ -147,6 +167,11 @@ export function createIO (operation) {
   }
 }
 ```
+
+
+### `IO.createRun(options)`
+
+`IO.createRun` takes a `context` and returns a function `run` that can be used to run an IO object inside a specified `context`.
 
 ```js
 // createRun.js
@@ -160,6 +185,13 @@ export function createRun ({ context }) {
   }
 }
 ```
+
+
+### `IO.do(generatorFunction)`
+
+`IO.do` takes a generator function and returns an IO function.
+
+The `generatorFunction` can `yield` other IO wrappers, and it will be run with the result returned back to the generator. It is expected that the IO wrapper, when run, will return a Promise.
 
 ```js
 // wrapGenerator.js
@@ -265,18 +297,9 @@ function ioShouldFail (io) {
 }
 ```
 
+### Obscure method name
+
 ```js
 // _runInContext.js
 export default '(╯°□°)╯︵ ┻━┻'
-```
-
-```js
-// index.js
-import { createIO } from './createIO'
-import { createRun } from './createRun'
-import { wrapGenerator } from './wrapGenerator'
-
-export { createIO, createRun }
-export { createIO as create }
-export { wrapGenerator as do }
 ```
